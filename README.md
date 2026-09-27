@@ -9,6 +9,11 @@ If you want Codex in your code editor (VS Code, Cursor, Windsurf), <a href="http
 
 ---
 
+> **AIX 7.3 / POWER:** This fork contains an experimental native AIX port.
+> The standard installers below do not install that build. Follow the
+> [AIX build, binary installation, and run guide](scripts/aix/README.md)
+> instead. Do not run the agent as root; AIX has no Codex OS sandbox backend.
+
 ## Quickstart
 
 ### Installing and running Codex CLI

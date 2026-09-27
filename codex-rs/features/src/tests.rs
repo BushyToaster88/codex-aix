@@ -123,6 +123,14 @@ fn default_enabled_features_are_stable() {
 }
 
 #[test]
+fn aix_native_build_defaults_to_embedded_mode() {
+    assert_eq!(
+        Features::with_defaults().enabled(Feature::DaemonAutoStart),
+        !cfg!(target_os = "aix"),
+    );
+}
+
+#[test]
 fn removed_apps_mcp_path_override_shapes_are_ignored() {
     let features = [
         toml::from_str::<FeaturesToml>("apps_mcp_path_override = true")

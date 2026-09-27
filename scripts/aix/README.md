@@ -124,6 +124,23 @@ unavailable. The hidden HTTP/3 `tcp-tunnel` command is excluded. The default
 native test suite and offline build wrapper passed; a real model-authenticated
 session has **not** yet been tested.
 
+### If startup says there is "no complete local package"
+
+A bare native binary has no `codex-package.json` manifest, so it cannot install
+the shared background daemon from itself. This fork disables daemon auto-start
+by default on AIX and runs the interactive CLI with its embedded server.
+For an older AIX build that still tries to start the daemon, use
+`codex --no-daemon` immediately, or add this to the unprivileged account's
+`~/.codex/config.toml` for plain `codex` launches:
+
+```toml
+[features]
+daemon_auto_start = false
+```
+
+Preserve any existing config sections. Do not invent a package manifest or
+select an installer intended for another operating system.
+
 ## Security boundary
 
 There is no AIX OS sandbox backend. Restricted native command execution and

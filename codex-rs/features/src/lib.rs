@@ -937,7 +937,9 @@ pub const FEATURES: &[FeatureSpec] = &[
         id: Feature::DaemonAutoStart,
         key: "daemon_auto_start",
         stage: Stage::Stable,
-        default_enabled: true,
+        // The AIX port builds a standalone executable, not a complete CLI
+        // package from which the shared daemon can install itself.
+        default_enabled: !cfg!(target_os = "aix"),
     },
     FeatureSpec {
         id: Feature::TranscriptV2,

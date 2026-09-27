@@ -794,6 +794,41 @@ mod tests {
         assert_eq!(request.env.get(&path_key), Some(&path));
     }
 
+    #[cfg(target_os = "aix")]
+    #[test]
+    fn aix_file_system_helper_rejects_missing_native_sandbox() {
+        let codex_self_exe = std::env::current_exe().expect("current exe");
+        let runtime_paths =
+            ExecServerRuntimePaths::new(codex_self_exe.clone(), Some(codex_self_exe))
+                .expect("runtime paths");
+        let runner = FileSystemSandboxRunner::new(runtime_paths);
+        let native_cwd = AbsolutePathBuf::current_dir().expect("cwd");
+        let cwd = PathUri::from_abs_path(&native_cwd);
+        let file_system_policy = restricted_policy(vec![]);
+        let permission_profile = PermissionProfile::from_runtime_permissions(
+            &file_system_policy,
+            NetworkSandboxPolicy::Restricted,
+        );
+        let sandbox_context = sandbox_context_with_cwd(&file_system_policy, cwd.clone());
+        let sandbox_cwd = SandboxCwd {
+            uri: cwd,
+            native: native_cwd,
+        };
+
+        let error = runner
+            .sandbox_exec_request(
+                &permission_profile,
+                &sandbox_cwd,
+                std::slice::from_ref(&sandbox_cwd.native),
+                &sandbox_context,
+            )
+            .expect_err("AIX must not run a filesystem helper without a native sandbox");
+        assert_eq!(
+            error.message,
+            "filesystem sandbox cannot be enforced on this executor"
+        );
+    }
+
     /// Removing the selected directory must not change permission anchoring or prevent launch.
     #[test]
     fn sandbox_exec_request_uses_filesystem_root_and_preserves_policy_cwd() {

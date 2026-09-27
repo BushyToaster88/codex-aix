@@ -62,6 +62,10 @@ use codex_utils_pty::process_group::terminate_process_group;
 
 pub const DEFAULT_EXEC_COMMAND_TIMEOUT_MS: u64 = 10_000;
 
+#[cfg(target_os = "aix")]
+pub(crate) const AIX_NATIVE_SANDBOX_UNAVAILABLE: &str =
+    "Codex cannot enforce a native sandbox on AIX; refusing to run this restricted local command";
+
 // Hardcode these since it does not seem worth including the libc crate just
 // for these.
 const SIGKILL_CODE: i32 = 9;
@@ -390,6 +394,18 @@ pub fn build_exec_request(
     let sandbox_policy_cwd_uri = PathUri::from_abs_path(sandbox_cwd);
 
     let manager = SandboxManager::new();
+    #[cfg(target_os = "aix")]
+    if sandbox_type == SandboxType::None
+        && manager.should_sandbox(
+            permission_profile,
+            SandboxablePreference::Auto,
+            enforce_managed_network,
+        )
+    {
+        return Err(CodexErr::UnsupportedOperation(
+            AIX_NATIVE_SANDBOX_UNAVAILABLE.to_string(),
+        ));
+    }
     let command = SandboxCommand {
         program: program.clone().into(),
         args: args.to_vec(),

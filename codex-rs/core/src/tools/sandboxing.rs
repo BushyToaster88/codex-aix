@@ -479,6 +479,12 @@ impl<'a> SandboxAttempt<'a> {
         network: Option<&NetworkProxy>,
         environment_id: Option<&str>,
     ) -> Result<crate::sandboxing::ExecRequest, CodexErr> {
+        #[cfg(target_os = "aix")]
+        if self.sandbox_requested && self.sandbox == SandboxType::None {
+            return Err(CodexErr::UnsupportedOperation(
+                crate::exec::AIX_NATIVE_SANDBOX_UNAVAILABLE.to_string(),
+            ));
+        }
         let network = self.network_proxy(network);
         let request = self
             .manager

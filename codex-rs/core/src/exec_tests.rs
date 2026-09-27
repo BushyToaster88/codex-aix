@@ -1191,6 +1191,7 @@ fn process_exec_tool_call_uses_platform_sandbox_for_network_only_restrictions() 
     );
 }
 
+#[cfg(not(target_os = "aix"))]
 #[test]
 fn build_exec_request_projects_workspace_roots_only_for_windows_sandbox() -> Result<()> {
     let temp_dir = tempfile::TempDir::new()?;
@@ -1258,6 +1259,47 @@ fn build_exec_request_projects_workspace_roots_only_for_windows_sandbox() -> Res
     } else {
         assert_eq!(request?.windows_sandbox_workspace_roots, Vec::new());
     }
+    Ok(())
+}
+
+#[cfg(target_os = "aix")]
+#[test]
+fn build_exec_request_fails_closed_without_native_sandbox() -> Result<()> {
+    let cwd = AbsolutePathBuf::current_dir()?;
+    let build_request = |profile: &PermissionProfile| {
+        build_exec_request(
+            ExecParams {
+                command: vec!["true".to_string()],
+                cwd: cwd.clone(),
+                expiration: ExecExpiration::DefaultTimeout,
+                capture_policy: ExecCapturePolicy::ShellTool,
+                env: HashMap::new(),
+                network: None,
+                network_environment_id: None,
+                sandbox_permissions: SandboxPermissions::UseDefault,
+                windows_sandbox_level: WindowsSandboxLevel::Disabled,
+                justification: None,
+                arg0: None,
+            },
+            profile,
+            &cwd,
+            &[],
+            &None,
+            &None,
+            SandboxType::None,
+            /*use_legacy_landlock*/ false,
+        )
+    };
+
+    let error = build_request(&PermissionProfile::read_only()).expect_err("AIX must fail closed");
+    assert_eq!(
+        error.to_string(),
+        format!("unsupported operation: {AIX_NATIVE_SANDBOX_UNAVAILABLE}"),
+    );
+    assert_eq!(
+        build_request(&PermissionProfile::Disabled)?.sandbox,
+        SandboxType::None,
+    );
     Ok(())
 }
 

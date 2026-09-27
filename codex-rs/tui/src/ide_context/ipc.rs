@@ -595,7 +595,8 @@ fn validate_unix_peer_owner(stream: &std::os::unix::net::UnixStream) -> std::io:
     target_os = "freebsd",
     target_os = "openbsd",
     target_os = "netbsd",
-    target_os = "dragonfly"
+    target_os = "dragonfly",
+    target_os = "aix"
 ))]
 fn validate_unix_peer_owner(stream: &std::os::unix::net::UnixStream) -> std::io::Result<()> {
     use std::os::fd::AsRawFd;
@@ -619,7 +620,8 @@ fn validate_unix_peer_owner(stream: &std::os::unix::net::UnixStream) -> std::io:
         target_os = "freebsd",
         target_os = "openbsd",
         target_os = "netbsd",
-        target_os = "dragonfly"
+        target_os = "dragonfly",
+        target_os = "aix"
     ))
 ))]
 fn validate_unix_peer_owner(_stream: &std::os::unix::net::UnixStream) -> std::io::Result<()> {
@@ -1161,6 +1163,25 @@ mod tests {
             .expect_err("world-writable parent directory should be rejected");
 
         assert_eq!(err.kind(), std::io::ErrorKind::PermissionDenied);
+    }
+
+    #[cfg(target_os = "aix")]
+    #[test]
+    fn aix_unix_peer_owner_validation_uses_getpeereid() {
+        use std::os::unix::net::UnixListener;
+        use std::os::unix::net::UnixStream;
+
+        let tempdir = tempfile::tempdir().expect("tempdir");
+        let socket_path = tempdir.path().join("peer.sock");
+        let listener = UnixListener::bind(&socket_path).expect("bind Unix socket");
+        let client = UnixStream::connect(&socket_path).expect("connect to Unix socket");
+        let (_server, _) = listener.accept().expect("accept Unix socket");
+        validate_unix_peer_owner(&client).expect("same-user peer should be accepted");
+
+        let other_uid = unsafe { libc::getuid() }.wrapping_add(1);
+        let error = ensure_peer_uid_matches_current_user(other_uid)
+            .expect_err("different-user peer should be rejected");
+        assert_eq!(error.kind(), std::io::ErrorKind::PermissionDenied);
     }
 
     #[cfg(unix)]

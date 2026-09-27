@@ -20,6 +20,9 @@ pub fn pre_main_hardening() {
     #[cfg(any(target_os = "freebsd", target_os = "openbsd"))]
     pre_main_hardening_bsd();
 
+    #[cfg(target_os = "aix")]
+    pre_main_hardening_aix();
+
     #[cfg(windows)]
     pre_main_hardening_windows();
 }
@@ -36,7 +39,8 @@ const PTRACE_DENY_ATTACH_FAILED_EXIT_CODE: i32 = 6;
     target_os = "macos",
     target_os = "freebsd",
     target_os = "netbsd",
-    target_os = "openbsd"
+    target_os = "openbsd",
+    target_os = "aix"
 ))]
 const SET_RLIMIT_CORE_FAILED_EXIT_CODE: i32 = 7;
 
@@ -77,6 +81,12 @@ pub(crate) fn pre_main_hardening_bsd() {
     set_core_file_size_limit_to_zero();
 
     remove_env_vars_with_prefix(b"LD_");
+}
+
+#[cfg(target_os = "aix")]
+pub(crate) fn pre_main_hardening_aix() {
+    // RLIMIT_CORE is available on AIX. Do not assume Linux/macOS ptrace APIs.
+    set_core_file_size_limit_to_zero();
 }
 
 #[cfg(target_os = "macos")]

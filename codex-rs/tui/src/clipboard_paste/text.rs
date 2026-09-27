@@ -21,13 +21,13 @@ pub(crate) fn read(deadline: Instant) -> Result<String, String> {
             .map_err(|_| "could not start clipboard reader")?
             .block_on(read_command(command, deadline));
     }
-    #[cfg(not(target_os = "android"))]
+    #[cfg(not(any(target_os = "android", target_os = "aix")))]
     let text = match arboard::Clipboard::new().and_then(|mut clipboard| clipboard.get_text()) {
         Ok(text) => text,
         Err(arboard::Error::ContentNotAvailable) => String::new(),
         Err(_) => return Err("clipboard text is unavailable".into()),
     };
-    #[cfg(target_os = "android")]
+    #[cfg(any(target_os = "android", target_os = "aix"))]
     let text = String::new();
     validate(text, deadline)
 }

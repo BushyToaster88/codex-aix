@@ -145,6 +145,7 @@ enum Subcommand {
     Agents(AgentsCommand),
 
     /// Internal: forward a local TCP socket through an HTTP/3 CONNECT proxy.
+    #[cfg(not(target_os = "aix"))]
     #[clap(hide = true)]
     TcpTunnel(codex_tcp_tunnel::Args),
     /// Run Codex non-interactively.
@@ -1128,6 +1129,7 @@ async fn cli_main(
             .await?;
             handle_app_exit(exit_info, daemon_cli_executable.as_deref())?;
         }
+        #[cfg(not(target_os = "aix"))]
         Some(Subcommand::TcpTunnel(args)) => {
             return codex_tcp_tunnel::run(args).await;
         }
@@ -2263,6 +2265,7 @@ fn unsupported_subcommand_name_for_strict_config(
         Some(Subcommand::ResponsesApiProxy(_)) => Some("responses-api-proxy"),
         Some(Subcommand::StdioToUds(_)) => Some("stdio-to-uds"),
         Some(Subcommand::Features(_)) => Some("features"),
+        #[cfg(not(target_os = "aix"))]
         Some(Subcommand::TcpTunnel(_)) => Some("tcp-tunnel"),
     }
 }
@@ -3391,6 +3394,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(not(target_os = "aix"))]
     fn tcp_tunnel_is_hidden_and_accepts_its_control_input_contract() {
         let root_help = help_from_args(&["codex", "--help"]);
         assert!(!root_help.contains("tcp-tunnel"), "{root_help}");
@@ -3418,6 +3422,12 @@ mod tests {
         ])
         .expect("generic tunnel should parse");
         assert!(matches!(cli.subcommand, Some(Subcommand::TcpTunnel(_))));
+    }
+
+    #[test]
+    #[cfg(target_os = "aix")]
+    fn tcp_tunnel_is_unavailable_without_aix_quic_support() {
+        assert!(MultitoolCli::try_parse_from(["codex", "tcp-tunnel"]).is_err());
     }
 
     #[test]

@@ -224,13 +224,17 @@ fn file_metadata(metadata: Stat, created_at_ms: i64) -> io::Result<FileMetadata>
             "path contains a symbolic link",
         ));
     }
+    #[cfg(target_os = "aix")]
+    let modified_at_ms = unix_time_ms(metadata.st_mtim.tv_sec, metadata.st_mtim.tv_nsec);
+    #[cfg(not(target_os = "aix"))]
+    let modified_at_ms = unix_time_ms(metadata.st_mtime, metadata.st_mtime_nsec);
     Ok(FileMetadata {
         is_directory: kind == libc::S_IFDIR,
         is_file: kind == libc::S_IFREG,
         is_symlink: false,
         size: u64::try_from(metadata.st_size).unwrap_or(0),
         created_at_ms,
-        modified_at_ms: unix_time_ms(metadata.st_mtime, metadata.st_mtime_nsec),
+        modified_at_ms,
     })
 }
 

@@ -61,7 +61,6 @@ codex-models-manager = { workspace = true }
 codex-plugin = { workspace = true }
 codex-protocol = { workspace = true }
 codex-responses-api-proxy = { workspace = true }
-codex-tcp-tunnel = { workspace = true }
 codex-rmcp-client = { workspace = true }
 codex-rollout = { workspace = true }
 codex-rollout-trace = { workspace = true }
@@ -117,6 +116,10 @@ windows-sys = { version = "0.52", features = [
     "Win32_System_Console",
     "Win32_System_Threading",
 ] }
+
+# The hidden HTTP/3 tunnel requires quinn-udp APIs not available on AIX.
+[target.'cfg(not(target_os = "aix"))'.dependencies]
+codex-tcp-tunnel = { workspace = true }
 
 [dev-dependencies]
 app_test_support = { workspace = true }

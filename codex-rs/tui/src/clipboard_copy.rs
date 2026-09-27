@@ -94,14 +94,14 @@ fn copy_to_clipboard(
     begin_delivery: impl Fn() -> Result<(), String>,
     osc52: impl Fn(&str) -> Result<(), String>,
 ) -> Result<CopyOutcome, String> {
-    #[cfg(not(target_os = "android"))]
+    #[cfg(not(any(target_os = "android", target_os = "aix")))]
     let native_copy = {
         let clipboard = arboard::Clipboard::new();
         move |text: &str, html: Option<&str>| arboard_copy(clipboard, text, html)
     };
-    #[cfg(target_os = "android")]
+    #[cfg(any(target_os = "android", target_os = "aix"))]
     let native_copy = |_text: &str, _html: Option<&str>| {
-        Err("native clipboard unavailable on Android".to_string())
+        Err("native clipboard unavailable on this platform".to_string())
     };
     // Decide before propagating setup success or failure: either result could otherwise
     // start a native write or fallback long after the user abandoned this request.
@@ -242,7 +242,7 @@ pub(crate) fn is_wsl_session() -> bool {
 }
 
 /// Write to the native clipboard. The TUI owns any process-wide stderr redirection.
-#[cfg(not(target_os = "android"))]
+#[cfg(not(any(target_os = "android", target_os = "aix")))]
 fn arboard_copy(
     clipboard: Result<arboard::Clipboard, arboard::Error>,
     text: &str,

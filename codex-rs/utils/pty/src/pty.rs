@@ -1,4 +1,8 @@
 use std::collections::HashMap;
+#[cfg(target_os = "aix")]
+use std::ffi::CStr;
+#[cfg(target_os = "aix")]
+use std::ffi::CString;
 #[cfg(unix)]
 use std::fs::File;
 use std::io::ErrorKind;
@@ -395,6 +399,16 @@ async fn spawn_process_preserving_fds(
         if let Some(shell) = &default_shell {
             command.env("SHELL", shell);
         }
+        #[cfg(target_os = "aix")]
+        let tty_path = {
+            let mut path = [0 as libc::c_char; 256];
+            let result =
+                unsafe { libc::ttyname_r(slave.as_raw_fd(), path.as_mut_ptr(), path.len()) };
+            if result != 0 {
+                return Err(std::io::Error::from_raw_os_error(result).into());
+            }
+            unsafe { CStr::from_ptr(path.as_ptr()) }.to_owned()
+        };
         let inherited_fds = inherited_fds.to_vec();
         // The child sees the same terminal on stdin, stdout, and stderr.
         unsafe {
@@ -403,6 +417,9 @@ async fn spawn_process_preserving_fds(
                 .stdout(Stdio::from(slave.try_clone()?))
                 .stderr(Stdio::from(slave.try_clone()?))
                 .pre_exec(move || {
+                    #[cfg(target_os = "aix")]
+                    configure_child_terminal(&tty_path)?;
+                    #[cfg(not(target_os = "aix"))]
                     configure_child_terminal()?;
                     close_inherited_fds_except(&inherited_fds);
                     make_fds_inheritable(&inherited_fds)?;
@@ -479,33 +496,87 @@ async fn spawn_process_preserving_fds(
 
 #[cfg(unix)]
 fn open_unix_pty(size: TerminalSize) -> Result<(File, File)> {
-    let mut master: RawFd = -1;
-    let mut slave: RawFd = -1;
-    let mut size = libc::winsize {
+    #[cfg(target_os = "aix")]
+    return open_unix_pty_aix(size);
+
+    #[cfg(not(target_os = "aix"))]
+    {
+        let mut master: RawFd = -1;
+        let mut slave: RawFd = -1;
+        let mut size = libc::winsize {
+            ws_row: size.rows,
+            ws_col: size.cols,
+            ws_xpixel: 0,
+            ws_ypixel: 0,
+        };
+        let winp = std::ptr::addr_of_mut!(size);
+
+        let result = unsafe {
+            libc::openpty(
+                &mut master,
+                &mut slave,
+                std::ptr::null_mut(),
+                std::ptr::null_mut(),
+                winp,
+            )
+        };
+        if result != 0 {
+            anyhow::bail!("failed to openpty: {:?}", std::io::Error::last_os_error());
+        }
+
+        set_cloexec(master)?;
+        set_cloexec(slave)?;
+
+        Ok(unsafe { (File::from_raw_fd(master), File::from_raw_fd(slave)) })
+    }
+}
+
+#[cfg(target_os = "aix")]
+unsafe extern "C" {
+    fn posix_openpt(flags: libc::c_int) -> libc::c_int;
+    fn grantpt(fd: libc::c_int) -> libc::c_int;
+    fn unlockpt(fd: libc::c_int) -> libc::c_int;
+    fn ptsname(fd: libc::c_int) -> *mut libc::c_char;
+}
+
+#[cfg(target_os = "aix")]
+fn open_unix_pty_aix(size: TerminalSize) -> Result<(File, File)> {
+    let master = unsafe { posix_openpt(libc::O_RDWR | libc::O_NOCTTY) };
+    if master < 0 {
+        return Err(std::io::Error::last_os_error().into());
+    }
+    let master = unsafe { File::from_raw_fd(master) };
+    if unsafe { grantpt(master.as_raw_fd()) } != 0 || unsafe { unlockpt(master.as_raw_fd()) } != 0 {
+        return Err(std::io::Error::last_os_error().into());
+    }
+    let slave_name = unsafe { ptsname(master.as_raw_fd()) };
+    if slave_name.is_null() {
+        return Err(std::io::Error::last_os_error().into());
+    }
+    let slave = unsafe { libc::open(slave_name, libc::O_RDWR | libc::O_NOCTTY) };
+    if slave < 0 {
+        return Err(std::io::Error::last_os_error().into());
+    }
+    let slave = unsafe { File::from_raw_fd(slave) };
+    let winsize = libc::winsize {
         ws_row: size.rows,
         ws_col: size.cols,
         ws_xpixel: 0,
         ws_ypixel: 0,
     };
-    let winp = std::ptr::addr_of_mut!(size);
-
-    let result = unsafe {
-        libc::openpty(
-            &mut master,
-            &mut slave,
-            std::ptr::null_mut(),
-            std::ptr::null_mut(),
-            winp,
+    if unsafe {
+        libc::ioctl(
+            slave.as_raw_fd(),
+            libc::TIOCSWINSZ as _,
+            &winsize as *const _,
         )
-    };
-    if result != 0 {
-        anyhow::bail!("failed to openpty: {:?}", std::io::Error::last_os_error());
+    } != 0
+    {
+        return Err(std::io::Error::last_os_error().into());
     }
-
-    set_cloexec(master)?;
-    set_cloexec(slave)?;
-
-    Ok(unsafe { (File::from_raw_fd(master), File::from_raw_fd(slave)) })
+    set_cloexec(master.as_raw_fd())?;
+    set_cloexec(slave.as_raw_fd())?;
+    Ok((master, slave))
 }
 
 #[cfg(unix)]
@@ -642,7 +713,9 @@ pub(crate) fn close_inherited_fds_except(preserved_fds: &[RawFd]) {
 /// Establish the controlling terminal and signal state before a PTY target exec.
 /// This also runs in the legacy pre-exec callback, so it must stay async-signal-safe.
 #[cfg(unix)]
-pub(crate) fn configure_child_terminal() -> std::io::Result<()> {
+pub(crate) fn configure_child_terminal(
+    #[cfg(target_os = "aix")] tty_path: &CString,
+) -> std::io::Result<()> {
     // SAFETY: These operations only change the calling child's signal/session state.
     unsafe {
         for signo in &[
@@ -666,9 +739,20 @@ pub(crate) fn configure_child_terminal() -> std::io::Result<()> {
         // stdin now refers to the PTY slave, so make that fd the
         // controlling terminal for the child's new session. stdout and
         // stderr point at clones of the same slave device.
+        #[cfg(not(target_os = "aix"))]
         #[allow(clippy::cast_lossless)]
         if libc::ioctl(0, libc::TIOCSCTTY as _, 0) == -1 {
             return Err(std::io::Error::last_os_error());
+        }
+        #[cfg(target_os = "aix")]
+        {
+            // AIX assigns the slave to a new session when its leader opens it
+            // without O_NOCTTY. The inherited stdin was opened before setsid.
+            let fd = libc::open(tty_path.as_ptr(), libc::O_RDWR);
+            if fd == -1 {
+                return Err(std::io::Error::last_os_error());
+            }
+            libc::close(fd);
         }
     }
     Ok(())
@@ -677,3 +761,7 @@ pub(crate) fn configure_child_terminal() -> std::io::Result<()> {
 #[cfg(all(test, target_os = "linux"))]
 #[path = "pty_linux_tests.rs"]
 mod linux_tests;
+
+#[cfg(all(test, target_os = "aix"))]
+#[path = "pty_aix_tests.rs"]
+mod aix_tests;

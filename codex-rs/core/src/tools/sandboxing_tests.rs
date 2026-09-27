@@ -17,6 +17,63 @@ use pretty_assertions::assert_eq;
 use serde_json::json;
 use std::collections::HashMap;
 
+#[cfg(target_os = "aix")]
+#[test]
+fn aix_native_exec_fails_closed_but_executor_managed_exec_is_preserved() {
+    let cwd = AbsolutePathBuf::current_dir().expect("current directory");
+    let cwd_uri = PathUri::from_abs_path(&cwd);
+    let permissions = codex_protocol::models::PermissionProfile::read_only();
+    let manager = SandboxManager::new();
+    let attempt = SandboxAttempt {
+        sandbox: SandboxType::None,
+        sandbox_requested: true,
+        permissions: &permissions,
+        exec_server_permissions: &permissions,
+        enforce_managed_network: false,
+        manager: &manager,
+        sandbox_cwd: &cwd_uri,
+        workspace_roots: std::slice::from_ref(&cwd_uri),
+        sandbox_exe: None,
+        use_legacy_landlock: false,
+        windows_sandbox_type: SandboxType::None,
+        windows_sandbox_level: codex_protocol::config_types::WindowsSandboxLevel::Disabled,
+        network_denial_cancellation_token: None,
+        network_proxy: None,
+    };
+    let command = || SandboxCommand {
+        program: "true".into(),
+        args: Vec::new(),
+        cwd: cwd_uri.clone(),
+        env: HashMap::new(),
+        managed_network: None,
+        additional_permissions: None,
+    };
+    let options = || crate::sandboxing::ExecOptions {
+        expiration: crate::exec::ExecExpiration::DefaultTimeout,
+        capture_policy: crate::exec::ExecCapturePolicy::ShellTool,
+    };
+
+    let error = attempt
+        .env_for(
+            command(),
+            options(),
+            /*network*/ None,
+            /*environment_id*/ None,
+        )
+        .expect_err("native AIX exec must fail closed");
+    assert_eq!(
+        error.to_string(),
+        format!(
+            "unsupported operation: {}",
+            crate::exec::AIX_NATIVE_SANDBOX_UNAVAILABLE
+        ),
+    );
+    let executor_request = attempt
+        .env_for_exec_server(command(), options())
+        .expect("executor-managed sandbox request remains available");
+    assert!(executor_request.exec_server_sandbox.is_some());
+}
+
 #[test]
 fn bash_permission_request_payload_omits_missing_description() {
     assert_eq!(

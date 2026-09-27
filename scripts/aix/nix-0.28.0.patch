@@ -1,0 +1,63 @@
+--- src/sys/signal.rs.orig
++++ src/sys/signal.rs
+@@ -765,7 +765,6 @@
+     /// is the `SigAction` variant). `mask` specifies other signals to block during execution of
+     /// the signal-catching function.
+     pub fn new(handler: SigHandler, flags: SaFlags, mask: SigSet) -> SigAction {
+-        #[cfg(not(target_os = "aix"))]
+         unsafe fn install_sig(p: *mut libc::sigaction, handler: SigHandler) {
+             unsafe {
+                  (*p).sa_sigaction = match handler {
+@@ -778,18 +777,6 @@
+             }
+         }
+ 
+-        #[cfg(target_os = "aix")]
+-        unsafe fn install_sig(p: *mut libc::sigaction, handler: SigHandler) {
+-            unsafe {
+-                (*p).sa_union.__su_sigaction = match handler {
+-                    SigHandler::SigDfl => unsafe { mem::transmute::<usize, extern "C" fn(libc::c_int, *mut libc::siginfo_t, *mut libc::c_void)>(libc::SIG_DFL) },
+-                    SigHandler::SigIgn => unsafe { mem::transmute::<usize, extern "C" fn(libc::c_int, *mut libc::siginfo_t, *mut libc::c_void)>(libc::SIG_IGN) },
+-                    SigHandler::Handler(f) => unsafe { mem::transmute::<extern "C" fn(i32), extern "C" fn(i32, *mut libc::siginfo_t, *mut libc::c_void)>(f) },
+-                    SigHandler::SigAction(f) => f,
+-                };
+-            }
+-        }
+-
+         let mut s = mem::MaybeUninit::<libc::sigaction>::uninit();
+         unsafe {
+             let p = s.as_mut_ptr();
+@@ -817,7 +804,6 @@
+     }
+ 
+     /// Returns the action's handler.
+-    #[cfg(not(target_os = "aix"))]
+     pub fn handler(&self) -> SigHandler {
+         match self.sigaction.sa_sigaction {
+             libc::SIG_DFL => SigHandler::SigDfl,
+@@ -851,25 +837,6 @@
+         }
+     }
+ 
+-    /// Returns the action's handler.
+-    #[cfg(target_os = "aix")]
+-    pub fn handler(&self) -> SigHandler {
+-        unsafe {
+-        match self.sigaction.sa_union.__su_sigaction as usize {
+-            libc::SIG_DFL => SigHandler::SigDfl,
+-            libc::SIG_IGN => SigHandler::SigIgn,
+-            p if self.flags().contains(SaFlags::SA_SIGINFO) =>
+-                SigHandler::SigAction(
+-                    *(&p as *const usize
+-                         as *const extern fn(_, _, _))
+-                as extern fn(_, _, _)),
+-            p => SigHandler::Handler(
+-                    *(&p as *const usize
+-                         as *const extern fn(libc::c_int))
+-                as extern fn(libc::c_int)),
+-        }
+-        }
+-    }
+ }
+ 
+ /// Changes the action taken by a process on receipt of a specific signal.

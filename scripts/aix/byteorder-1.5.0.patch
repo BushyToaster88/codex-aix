@@ -1,0 +1,39 @@
+--- src/lib.rs.orig
++++ src/lib.rs
+@@ -1268,8 +1268,18 @@
+     #[inline]
+     fn read_f64_into(src: &[u8], dst: &mut [f64]) {
++        #[cfg(target_os = "aix")]
++        {
++            assert_eq!(src.len(), 8 * dst.len());
++            for (chunk, value) in src.chunks_exact(8).zip(dst.iter_mut()) {
++                *value = f64::from_bits(Self::read_u64(chunk));
++            }
++        }
++        #[cfg(not(target_os = "aix"))]
++        {
+         let dst = unsafe {
+             const _: () = assert!(align_of::<u64>() <= align_of::<f64>());
+             slice::from_raw_parts_mut(dst.as_mut_ptr() as *mut u64, dst.len())
+         };
+         Self::read_u64_into(src, dst);
++        }
+     }
+@@ -1597,7 +1607,17 @@
+     /// ```
+     fn write_f64_into(src: &[f64], dst: &mut [u8]) {
++        #[cfg(target_os = "aix")]
++        {
++            assert_eq!(dst.len(), 8 * src.len());
++            for (value, chunk) in src.iter().zip(dst.chunks_exact_mut(8)) {
++                Self::write_u64(chunk, value.to_bits());
++            }
++        }
++        #[cfg(not(target_os = "aix"))]
++        {
+         let src = unsafe {
+             slice::from_raw_parts(src.as_ptr() as *const u64, src.len())
+         };
+         Self::write_u64_into(src, dst);
++        }
+     }

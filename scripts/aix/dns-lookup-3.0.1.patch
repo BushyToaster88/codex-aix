@@ -1,0 +1,11 @@
+--- src/nameinfo.rs
++++ src/nameinfo.rs
+@@ -31,6 +31,8 @@
+     let sock: SockAddr = (*sock).into();
+     let c_sock = sock.as_ptr();
+     let c_sock_len = sock.len();
++    #[cfg(target_os = "aix")]
++    let c_sock_len = c_sock_len as usize;
+ 
+     // Hard code maximums, as they aren't defined in libc/windows-sys.
+ 

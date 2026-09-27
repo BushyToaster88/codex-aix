@@ -140,6 +140,11 @@ tokio-util = { workspace = true, features = ["time"] }
 [target.'cfg(unix)'.dependencies]
 libc = { workspace = true }
 
+[target.'cfg(target_os = "aix")'.dependencies]
+# Mio's poll backend disarms raw TTY readiness after one event; Crossterm's
+# dev-TTY backend uses level-triggered poll and keeps reading subsequent keys.
+crossterm = { workspace = true, features = ["use-dev-tty"] }
+
 [target.'cfg(target_os = "macos")'.dependencies]
 objc2-app-kit = { version = "0.3.2", default-features = false, features = ["std", "NSAccessibility", "NSWorkspace"] }
 objc2-foundation = { version = "0.3.2", default-features = false, features = ["std", "NSDateFormatter", "NSFormatter", "NSLocale", "NSString"] }
@@ -165,9 +170,9 @@ windows-sys = { version = "0.52", features = [
 ] }
 winsplit = "0.1"
 
-# Clipboard support via `arboard` is not available on Android/Termux.
-# Only include it for non-Android targets so the crate builds on Android.
-[target.'cfg(not(target_os = "android"))'.dependencies]
+# Native clipboard support via `arboard` is unavailable on Android/Termux and AIX.
+# AIX still supports terminal clipboard copy through OSC 52.
+[target.'cfg(not(any(target_os = "android", target_os = "aix")))'.dependencies]
 arboard = { workspace = true }
 
 

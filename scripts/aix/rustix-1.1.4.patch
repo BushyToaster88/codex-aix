@@ -1,0 +1,15 @@
+--- src/backend/libc/termios/syscalls.rs
++++ src/backend/libc/termios/syscalls.rs
+@@ -500,8 +500,12 @@ pub(crate) fn cfmakeraw(termios: &mut Termios) {
+         #[cfg(target_os = "aix")]
+         {
+             let _ = c::cfmakeraw(as_mut_ptr(termios).cast());
++            // AIX leaves VEOF/VEOL values in the aliased VMIN/VTIME slots.
++            // A TUI must accept one key without waiting for four bytes.
++            termios.special_codes[crate::termios::SpecialCodeIndex::VMIN] = 1;
++            termios.special_codes[crate::termios::SpecialCodeIndex::VTIME] = 0;
+         }
+
+         #[cfg(not(target_os = "aix"))]
+         {
+             c::cfmakeraw(as_mut_ptr(termios).cast());

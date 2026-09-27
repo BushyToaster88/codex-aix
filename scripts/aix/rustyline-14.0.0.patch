@@ -1,0 +1,30 @@
+--- src/tty/unix.rs.orig
++++ src/tty/unix.rs
+@@ -39,7 +39,18 @@
+ const BRACKETED_PASTE_ON: &str = "\x1b[?2004h";
+ const BRACKETED_PASTE_OFF: &str = "\x1b[?2004l";
+ 
++#[cfg(not(target_os = "aix"))]
+ nix::ioctl_read_bad!(win_size, libc::TIOCGWINSZ, libc::winsize);
+ 
++#[cfg(target_os = "aix")]
++unsafe fn win_size(fd: RawFd, size: &mut libc::winsize) -> nix::Result<libc::c_int> {
++    Errno::result(unsafe { libc::ioctl(fd, libc::TIOCGWINSZ, size as *mut _) })
++}
++
++#[cfg(target_os = "aix")]
++const WOULD_BLOCK: Errno = Errno::EAGAIN;
++#[cfg(not(target_os = "aix"))]
++const WOULD_BLOCK: Errno = Errno::EWOULDBLOCK;
++
+ #[allow(clippy::useless_conversion)]
+ fn get_win_size(fd: RawFd) -> (usize, usize) {
+@@ -173,7 +184,7 @@
+             match read(pipe, &mut buf) {
+                 Ok(0) => Ok(false),
+                 Ok(_) => Ok(true),
+-                Err(e) if e == Errno::EWOULDBLOCK || e == Errno::EINTR => Ok(false),
++                Err(e) if e == WOULD_BLOCK || e == Errno::EINTR => Ok(false),
+                 Err(e) => Err(e),
+             }
+         } else {

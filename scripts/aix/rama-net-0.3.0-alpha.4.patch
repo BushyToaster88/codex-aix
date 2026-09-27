@@ -1,0 +1,98 @@
+--- src/socket/opts.rs.orig
++++ src/socket/opts.rs
+@@ -169,6 +169,7 @@
+     pub time: Option<Duration>,
+ 
+     #[cfg(not(any(
++        target_os = "aix",
+         target_os = "openbsd",
+         target_os = "redox",
+         target_os = "solaris",
+@@ -180,6 +181,7 @@
+     #[cfg_attr(
+         docsrs,
+         doc(cfg(not(any(
++            target_os = "aix",
+             target_os = "openbsd",
+             target_os = "redox",
+             target_os = "solaris",
+@@ -199,6 +201,7 @@
+     pub interval: Option<Duration>,
+ 
+     #[cfg(not(any(
++        target_os = "aix",
+         target_os = "openbsd",
+         target_os = "redox",
+         target_os = "solaris",
+@@ -211,6 +214,7 @@
+     #[cfg_attr(
+         docsrs,
+         doc(cfg(not(any(
++            target_os = "aix",
+             target_os = "openbsd",
+             target_os = "redox",
+             target_os = "solaris",
+@@ -240,6 +244,7 @@
+             Options {
+                 time: Option<Duration>,
+                 #[cfg(not(any(
++                    target_os = "aix",
+                     target_os = "openbsd",
+                     target_os = "redox",
+                     target_os = "solaris",
+@@ -250,6 +255,7 @@
+                 )))]
+                 interval: Option<Duration>,
+                 #[cfg(not(any(
++                    target_os = "aix",
+                     target_os = "openbsd",
+                     target_os = "redox",
+                     target_os = "solaris",
+@@ -271,6 +277,7 @@
+             Variants::Options {
+                 time,
+                 #[cfg(not(any(
++                    target_os = "aix",
+                     target_os = "openbsd",
+                     target_os = "redox",
+                     target_os = "solaris",
+@@ -281,6 +288,7 @@
+                 )))]
+                 interval,
+                 #[cfg(not(any(
++                    target_os = "aix",
+                     target_os = "openbsd",
+                     target_os = "redox",
+                     target_os = "solaris",
+@@ -294,6 +302,7 @@
+             } => Ok(Self {
+                 time,
+                 #[cfg(not(any(
++                    target_os = "aix",
+                     target_os = "openbsd",
+                     target_os = "redox",
+                     target_os = "solaris",
+@@ -304,6 +313,7 @@
+                 )))]
+                 interval,
+                 #[cfg(not(any(
++                    target_os = "aix",
+                     target_os = "openbsd",
+                     target_os = "redox",
+                     target_os = "solaris",
+@@ -337,6 +347,7 @@
+         };
+ 
+         #[cfg(not(any(
++            target_os = "aix",
+             target_os = "openbsd",
+             target_os = "redox",
+             target_os = "solaris",
+@@ -351,6 +362,7 @@
+         };
+ 
+         #[cfg(not(any(
++            target_os = "aix",
+             target_os = "openbsd",
+             target_os = "redox",
+             target_os = "solaris",

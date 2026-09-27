@@ -42,7 +42,7 @@ use tokio_stream::Stream;
 pub use self::frame_requester::FrameRequester;
 use self::input_boundary::TerminalInitializationGuard;
 pub(crate) use self::input_boundary::discard_pending_terminal_input;
-#[cfg(all(test, unix))]
+#[cfg(all(test, unix, not(target_os = "aix")))]
 use self::input_boundary::terminal_input_is_readable;
 use crate::custom_terminal;
 use crate::custom_terminal::Terminal as CustomTerminal;
@@ -73,14 +73,16 @@ mod keyboard_modes;
 #[cfg(test)]
 #[path = "tui/owned_screen_tests.rs"]
 mod owned_screen_tests;
-#[cfg(all(test, unix))]
+// These PTY integration tests use libc::openpty, which AIX does not expose.
+// AIX terminal input is exercised through the native CLI smoke test instead.
+#[cfg(all(test, unix, not(target_os = "aix")))]
 #[path = "tui_panic_tests.rs"]
 mod panic_tests;
 mod screen_size;
 mod scrollback;
 mod selection_clipboard;
 mod size_monitor;
-#[cfg(all(test, unix))]
+#[cfg(all(test, unix, not(target_os = "aix")))]
 #[path = "tui_startup_tests.rs"]
 mod startup_tests;
 mod terminal_stderr;

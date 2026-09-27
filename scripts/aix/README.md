@@ -129,6 +129,8 @@ session has **not** yet been tested.
 A bare native binary has no `codex-package.json` manifest, so it cannot install
 the shared background daemon from itself. This fork disables daemon auto-start
 by default on AIX and runs the interactive CLI with its embedded server.
+Shared-daemon-only commands, such as the agents overview, still require a
+complete AIX CLI package and are not provided by this native build.
 For an older AIX build that still tries to start the daemon, use
 `codex --no-daemon` immediately, or add this to the unprivileged account's
 `~/.codex/config.toml` for plain `codex` launches:
